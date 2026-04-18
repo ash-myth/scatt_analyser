@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCATT Performance Analyser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Tokens ── */
+:root {
+  --bg:        #07090c;
+  --panel:     #0c1117;
+  --panel2:    #101820;
+  --border:    #1a2a35;
+  --border2:   #253d4a;
+  --amber:     #e8a020;
+  --amber-lo:  rgba(232,160,32,0.12);
+  --green:     #27c96f;
+  --green-lo:  rgba(39,201,111,0.10);
+  --red:       #e5403a;
+  --red-lo:    rgba(229,64,58,0.12);
+  --blue:      #4aabdf;
+  --text:      #d0dde8;        /* main readable text */
+  --text2:     #8ba0b0;        /* secondary */
+  --muted:     #3d5566;        /* de-emphasis */
+  --mono:      'Share Tech Mono', 'Courier New', monospace;
+  --cond:      'Barlow Condensed', sans-serif;
+  --sans:      'DM Sans', system-ui, sans-serif;  /* readable body */
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:14px;
+  line-height:1.6;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* Subtle noise */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  opacity:.5;
+}
+
+.shell{position:relative;z-index:1}
+
+/* ── Header ── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 28px;
+  border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,#0b1219 0%,transparent 100%);
+}
+.logo{display:flex;align-items:center;gap:12px}
+.logo svg{width:34px;height:34px;flex-shrink:0}
+.logo-text{font-family:var(--cond);font-weight:700;font-size:20px;letter-spacing:3px;color:var(--amber);text-transform:uppercase}
+.logo-sub{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-top:1px}
+.hdr-status{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px}
+
+/* ── Layout ── */
+main{display:grid;grid-template-columns:360px 1fr;min-height:calc(100vh - 69px)}
+
+/* ── Sidebar ── */
+.sidebar{
+  border-right:1px solid var(--border);
+  padding:24px 20px;
+  display:flex;flex-direction:column;gap:20px;
+  background:var(--panel);
+}
+
+.sec-label{
+  font-family:var(--mono);font-size:9px;letter-spacing:3px;
+  color:var(--muted);text-transform:uppercase;
+  display:flex;align-items:center;gap:8px;margin-bottom:8px;
+}
+.sec-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── Drop zones ── */
+.dz-wrap{position:relative}
+.dz-clear{
+  position:absolute;top:8px;right:8px;z-index:2;
+  background:none;border:none;color:var(--muted);font-size:14px;
+  cursor:pointer;line-height:1;padding:2px 4px;border-radius:2px;
+  transition:color .15s;display:none;
+}
+.dz-clear:hover{color:var(--red)}
+.dz-clear.show{display:block}
+
+.dropzone{
+  border:1px dashed var(--border2);border-radius:4px;
+  padding:18px 14px;text-align:center;cursor:pointer;
+  transition:all .2s;position:relative;overflow:hidden;
+  background:var(--panel2);user-select:none;
+}
+.dropzone::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(135deg,transparent 50%,rgba(232,160,32,.03) 100%);
+}
+.dropzone:hover,.dropzone.drag-over{border-color:var(--amber);background:rgba(232,160,32,.04)}
+.dropzone.has-file{border-color:var(--green);border-style:solid;background:rgba(39,201,111,.04)}
+.dropzone.has-file .dz-icon{color:var(--green)}
+
+.dz-icon{font-size:24px;display:block;margin-bottom:6px;color:var(--muted);transition:color .2s}
+.dz-label{font-family:var(--cond);font-size:14px;font-weight:600;letter-spacing:1px;color:var(--text);margin-bottom:3px}
+.dz-hint{font-family:var(--mono);font-size:9px;color:var(--text2)}
+.dz-hint.ok{color:var(--green)}
+
+.file-list{margin-top:10px;display:flex;flex-direction:column;gap:3px;text-align:left}
+.file-chip{
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:9px;color:var(--green);
+  background:rgba(39,201,111,.07);padding:3px 8px;border-radius:2px;
+}
+.file-chip .rm{
+  margin-left:auto;cursor:pointer;background:none;border:none;
+  color:var(--muted);font-size:11px;padding:0;transition:color .15s;
+}
+.file-chip .rm:hover{color:var(--red)}
+input[type=file]{display:none}
+
+/* ── Buttons ── */
+.btn-analyse{
+  width:100%;padding:13px;background:var(--amber);color:#07090c;
+  border:none;font-family:var(--cond);font-size:15px;font-weight:700;
+  letter-spacing:3px;text-transform:uppercase;cursor:pointer;
+  border-radius:3px;transition:all .2s;position:relative;overflow:hidden;
+}
+.btn-analyse::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.12) 0%,transparent 100%);
+}
+.btn-analyse:hover:not(:disabled){background:#f2b030;transform:translateY(-1px);box-shadow:0 6px 18px rgba(232,160,32,.28)}
+.btn-analyse:disabled{opacity:.35;cursor:not-allowed;transform:none}
+
+.btn-dl{
+  display:none;width:100%;padding:11px;background:transparent;
+  color:var(--green);border:1px solid var(--green);
+  font-family:var(--cond);font-size:14px;font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  border-radius:3px;transition:all .2s;text-decoration:none;text-align:center;
+}
+.btn-dl.show{display:block}
+.btn-dl:hover{background:rgba(39,201,111,.08);box-shadow:0 0 14px rgba(39,201,111,.18)}
+
+/* ── Progress ── */
+.prog-wrap{display:none}
+.prog-wrap.on{display:block}
+.prog-track{height:2px;background:var(--border);border-radius:1px;overflow:hidden;margin-bottom:7px}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--amber),#f2b030);width:0%;transition:width .4s ease;border-radius:1px}
+.prog-msg{font-family:var(--mono);font-size:9px;color:var(--amber);letter-spacing:1px}
+
+/* ── Info ── */
+.info-box{
+  background:var(--panel2);border:1px solid var(--border);
+  border-radius:3px;padding:10px 12px;
+  font-family:var(--sans);font-size:12px;color:var(--text2);line-height:1.6;
+}
+.info-box strong{color:var(--amber);font-weight:500}
+
+/* ── Error ── */
+.err-banner{
+  display:none;background:var(--red-lo);border:1px solid var(--red);
+  border-radius:3px;padding:10px 12px;font-family:var(--sans);
+  font-size:12px;color:var(--red);line-height:1.5;
+}
+.err-banner.show{display:block}
+
+/* ── Dashboard panel ── */
+.dashboard{padding:24px 28px;overflow-y:auto}
+
+/* ── Empty state ── */
+.empty{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;min-height:65vh;gap:14px;opacity:.25;
+}
+.empty-icon{font-size:60px;line-height:1}
+.empty-t{font-family:var(--cond);font-size:16px;letter-spacing:4px;color:var(--text2);text-transform:uppercase}
+.empty-s{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px}
+
+/* ── Results ── */
+#results{display:none}
+#results.show{display:block}
+
+.res-head{display:flex;align-items:baseline;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+.res-shooter{font-family:var(--cond);font-size:30px;font-weight:700;letter-spacing:2px;color:var(--amber);text-transform:uppercase}
+.res-meta{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:1px}
+
+/* ── Scorecard ── */
+.scorecard{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+@media(max-width:1100px){.scorecard{grid-template-columns:repeat(2,1fr)}}
+.stat-card{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:3px;padding:14px 16px;position:relative;overflow:hidden;
+}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--border2)}
+.stat-card.green::before{background:var(--green)}
+.stat-card.amber::before{background:var(--amber)}
+.stat-card.red::before{background:var(--red)}
+.stat-lbl{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+.stat-val{font-family:var(--mono);font-size:24px;line-height:1;color:var(--text)}
+.stat-val.green{color:var(--green)}
+.stat-val.amber{color:var(--amber)}
+.stat-val.red{color:var(--red)}
+.stat-unit{font-size:11px;color:var(--text2);margin-left:2px}
+.stat-bench{font-family:var(--sans);font-size:11px;color:var(--muted);margin-top:4px}
+
+/* ── Health bar ── */
+.health-wrap{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:3px;padding:14px 16px;margin-bottom:20px;
+  display:flex;align-items:center;gap:16px;
+}
+.health-lbl{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);white-space:nowrap}
+.health-bar{flex:1;height:10px;border-radius:2px;overflow:hidden;display:flex;gap:2px}
+.hseg.green{background:var(--green)}
+.hseg.amber{background:var(--amber)}
+.hseg.red{background:var(--red)}
+.health-counts{display:flex;gap:14px;font-family:var(--sans);font-size:12px;font-weight:500;white-space:nowrap}
+.health-counts .g{color:var(--green)}
+.health-counts .a{color:var(--amber)}
+.health-counts .r{color:var(--red)}
+
+/* ── Chart ── */
+.chart-wrap{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:3px;padding:16px;margin-bottom:20px;
+}
+.chart-title{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);margin-bottom:12px}
+#scoreChart{display:block;width:100%;height:130px}
+
+/* ── Lower grid ── */
+.lower-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+@media(max-width:1000px){.lower-grid{grid-template-columns:1fr}}
+
+.panel-box{background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:16px}
+.panel-ttl{
+  font-family:var(--cond);font-size:12px;font-weight:700;
+  letter-spacing:2px;color:var(--amber);text-transform:uppercase;margin-bottom:12px;
+}
+
+/* Issues */
+.issue-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)}
+.issue-row:last-child{border-bottom:none}
+.issue-name{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--amber);flex:1}
+.issue-bar{width:55px;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.issue-bar-fill{height:100%;background:var(--amber);border-radius:2px}
+.issue-count{font-family:var(--mono);font-size:16px;color:var(--text);min-width:24px;text-align:right}
+
+/* Drills */
+.drill-item{padding:8px 0;border-bottom:1px solid var(--border)}
+.drill-item:last-child{border-bottom:none}
+.drill-name{font-family:var(--sans);font-size:13px;font-weight:500;color:var(--text);margin-bottom:2px}
+.drill-dur{font-family:var(--mono);font-size:9px;color:var(--blue);letter-spacing:1px;margin-bottom:4px}
+.drill-desc{font-family:var(--sans);font-size:12px;color:var(--text2);line-height:1.55}
+
+/* ── Shot table ── */
+.tbl-wrap{background:var(--panel);border:1px solid var(--border);border-radius:3px;overflow:hidden}
+.tbl-hdr{
+  display:flex;align-items:center;padding:10px 14px;
+  border-bottom:1px solid var(--border2);background:var(--panel2);
+}
+.tbl-ttl{font-family:var(--cond);font-size:12px;font-weight:700;letter-spacing:2px;color:var(--amber);text-transform:uppercase;flex:1}
+.filter-btns{display:flex;gap:5px}
+.fb{
+  background:none;border:1px solid var(--border2);color:var(--text2);
+  font-family:var(--mono);font-size:8px;letter-spacing:1px;
+  padding:3px 7px;cursor:pointer;border-radius:2px;transition:all .15s;
+}
+.fb:hover{border-color:var(--amber);color:var(--amber)}
+.fb.fa{border-color:var(--amber);color:var(--amber);background:var(--amber-lo)}
+.fb.fg{border-color:var(--green);color:var(--green);background:var(--green-lo)}
+.fb.fr{border-color:var(--red);color:var(--red);background:var(--red-lo)}
+
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{
+  text-align:right;padding:7px 11px;
+  font-family:var(--mono);font-size:9px;letter-spacing:1px;
+  color:var(--muted);font-weight:normal;
+  border-bottom:1px solid var(--border);background:var(--panel2);
+}
+.tbl th:first-child,.tbl th:nth-child(2){text-align:left}
+.tbl td{
+  padding:7px 11px;text-align:right;
+  border-bottom:1px solid var(--border);
+  font-family:var(--sans);color:var(--text);vertical-align:middle;
+}
+.tbl td:first-child{text-align:left;font-family:var(--mono);color:var(--muted)}
+.tbl td:nth-child(2){text-align:left}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(255,255,255,.015)}
+/* numeric columns in mono for alignment */
+.tbl td.num{font-family:var(--mono);font-size:11px}
+
+.pill{
+  display:inline-block;padding:2px 7px;border-radius:2px;
+  font-family:var(--mono);font-size:8px;letter-spacing:1px;text-transform:uppercase;font-weight:bold;
+}
+.pill.green{background:var(--green-lo);color:var(--green)}
+.pill.amber{background:var(--amber-lo);color:var(--amber)}
+.pill.red{background:var(--red-lo);color:var(--red)}
+
+.diag-cell{font-family:var(--sans);font-size:11px;color:var(--text2);max-width:240px;text-align:left}
+
+/* ── Animations ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.anim{animation:fadeUp .35s ease both}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.pulsing{animation:pulse 1.4s infinite}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="17" cy="17" r="15" stroke="#e8a020" stroke-width="1"/>
+      <circle cx="17" cy="17" r="7.5" stroke="#e8a020" stroke-width=".7" stroke-dasharray="2 2"/>
+      <circle cx="17" cy="17" r="1.8" fill="#e8a020"/>
+      <line x1="17" y1="2" x2="17" y2="7.5" stroke="#e8a020" stroke-width="1"/>
+      <line x1="17" y1="26.5" x2="17" y2="32" stroke="#e8a020" stroke-width="1"/>
+      <line x1="2" y1="17" x2="7.5" y2="17" stroke="#e8a020" stroke-width="1"/>
+      <line x1="26.5" y1="17" x2="32" y2="17" stroke="#e8a020" stroke-width="1"/>
+    </svg>
+    <div>
+      <div class="logo-text">SCATT</div>
+      <div class="logo-sub">PERFORMANCE ANALYSER</div>
+    </div>
+  </div>
+  <div class="hdr-status" id="hdrStatus">AWAITING INPUT</div>
+</header>
+
+<main>
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+
+  <!-- DB file -->
+  <div>
+    <div class="sec-label">Session File</div>
+    <div class="dz-wrap">
+      <button class="dz-clear" id="dbClear" title="Remove file" onclick="clearDb()">✕</button>
+      <div class="dropzone" id="dbZone" onclick="document.getElementById('dbInput').click()">
+        <input type="file" id="dbInput" accept=".scatt-expert,.db,.sqlite">
+        <span class="dz-icon" id="dbIcon">🎯</span>
+        <div class="dz-label">Drop .scatt-expert</div>
+        <div class="dz-hint" id="dbHint">or click to browse</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screenshots -->
+  <div>
+    <div class="sec-label">Screenshots</div>
+    <div class="dz-wrap">
+      <button class="dz-clear" id="imgClear" title="Clear all screenshots" onclick="clearImgs()">✕</button>
+      <div class="dropzone" id="imgZone" onclick="document.getElementById('imgInput').click()">
+        <input type="file" id="imgInput" accept="image/*" multiple>
+        <span class="dz-icon" id="imgIcon">📸</span>
+        <div class="dz-label">Drop Screenshots</div>
+        <div class="dz-hint" id="imgHint">PNG / JPG · multiple files OK</div>
+        <div class="file-list" id="fileList"></div>
+      </div>
+    </div>
+    <div class="info-box" style="margin-top:8px">
+      <strong>Multi-screenshot tip:</strong> If SCATT scrolls past 35 shots, take one screenshot per scroll position and upload them all together. Shot IDs are read automatically — no overlaps. <strong>Max 100 shots.</strong>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="prog-wrap" id="progWrap">
+    <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+    <div class="prog-msg pulsing" id="progMsg">Initialising…</div>
+  </div>
+
+  <!-- Error -->
+  <div class="err-banner" id="errBanner"></div>
+
+  <button class="btn-analyse" id="btnAnalyse" disabled onclick="startAnalysis()">▶ &nbsp;Analyse Session</button>
+
+  <a class="btn-dl" id="btnDl" href="#" download>↓ &nbsp;Download PDF Report</a>
+
+  <div class="info-box">
+    <strong>Benchmarks</strong> — ISSF 10m Air Rifle<br>
+    Elite score ≥ 10.5 · DA &lt; 1.0 mm<br>
+    S2 &lt; 10 mm/s · Hold ≥ 98% in 10-ring<br>
+    Optimal aiming time 8 – 12 s
+  </div>
+
+</aside>
+
+<!-- ── Dashboard ── -->
+<section class="dashboard">
+
+  <div class="empty" id="emptyState">
+    <div class="empty-icon">⊕</div>
+    <div class="empty-t">Load a session to begin</div>
+    <div class="empty-s">Drop your .scatt-expert file and screenshot(s) on the left</div>
+  </div>
+
+  <div id="results">
+
+    <div class="res-head">
+      <div class="res-shooter" id="resShooter">—</div>
+      <div class="res-meta" id="resMeta">—</div>
+    </div>
+
+    <div class="scorecard" id="scorecard"></div>
+
+    <div class="health-wrap">
+      <div class="health-lbl">SHOT HEALTH</div>
+      <div class="health-bar" id="healthBar"></div>
+      <div class="health-counts" id="healthCounts"></div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">SCORE PROGRESSION — SHOT BY SHOT</div>
+      <canvas id="scoreChart"></canvas>
+    </div>
+
+    <div class="lower-grid">
+      <div class="panel-box">
+        <div class="panel-ttl">Top Issues</div>
+        <div id="issuesList"></div>
+      </div>
+      <div class="panel-box">
+        <div class="panel-ttl">Prescribed Drills</div>
+        <div id="drillsList"></div>
+      </div>
+    </div>
+
+    <div class="tbl-wrap">
+      <div class="tbl-hdr">
+        <div class="tbl-ttl">Per-Shot Analysis</div>
+        <div class="filter-btns">
+          <button class="fb fa" id="fAll"   onclick="filterTable('all')">ALL</button>
+          <button class="fb"    id="fGreen" onclick="filterTable('green')">CLEAN</button>
+          <button class="fb"    id="fAmber" onclick="filterTable('amber')">WATCH</button>
+          <button class="fb"    id="fRed"   onclick="filterTable('red')">ISSUE</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl" id="shotTable">
+          <thead><tr>
+            <th>#</th><th>Status</th><th>Score</th>
+            <th>DA mm</th><th>S1</th><th>S2</th>
+            <th>Hold%</th><th>Aim s</th><th>Int s</th><th>Diagnosis</th>
+          </tr></thead>
+          <tbody id="shotTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /results -->
+</section>
+</main>
+</div>
+
+<script>
+// ── State ──
+let dbFile = null;
+let imgFiles = [];
+let jobId = null;
+let pollTimer = null;
+let chartShots = [];
+
+// ── Drop zone wiring ──
+function wire(zoneId, multi) {
+  const z = document.getElementById(zoneId);
+  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('drag-over'); });
+  z.addEventListener('dragleave', () => z.classList.remove('drag-over'));
+  z.addEventListener('drop', e => {
+    e.preventDefault(); z.classList.remove('drag-over');
+    const files = [...e.dataTransfer.files];
+    if (multi) addImgs(files); else setDb(files[0]);
+  });
+}
+wire('dbZone', false);
+wire('imgZone', true);
+document.getElementById('dbInput').addEventListener('change', e => { if(e.target.files[0]) setDb(e.target.files[0]); });
+document.getElementById('imgInput').addEventListener('change', e => addImgs([...e.target.files]));
+
+function setDb(f) {
+  if (!f) return;
+  dbFile = f;
+  document.getElementById('dbZone').classList.add('has-file');
+  document.getElementById('dbIcon').textContent = '✓';
+  document.getElementById('dbHint').textContent = f.name;
+  document.getElementById('dbHint').className = 'dz-hint ok';
+  document.getElementById('dbClear').classList.add('show');
+  checkReady();
+}
+function clearDb() {
+  dbFile = null;
+  document.getElementById('dbZone').classList.remove('has-file');
+  document.getElementById('dbIcon').textContent = '🎯';
+  document.getElementById('dbHint').textContent = 'or click to browse';
+  document.getElementById('dbHint').className = 'dz-hint';
+  document.getElementById('dbClear').classList.remove('show');
+  document.getElementById('dbInput').value = '';
+  checkReady();
+}
+
+function addImgs(files) {
+  files = files.filter(f => f.type.startsWith('image/'));
+  imgFiles = [...imgFiles, ...files];
+  renderImgList();
+  checkReady();
+}
+function removeImg(i) {
+  imgFiles.splice(i, 1);
+  renderImgList();
+  checkReady();
+}
+function clearImgs() {
+  imgFiles = [];
+  renderImgList();
+  checkReady();
+}
+function renderImgList() {
+  const list = document.getElementById('fileList');
+  const zone = document.getElementById('imgZone');
+  const hint = document.getElementById('imgHint');
+  const icon = document.getElementById('imgIcon');
+  const clr  = document.getElementById('imgClear');
+  list.innerHTML = '';
+  if (!imgFiles.length) {
+    zone.classList.remove('has-file');
+    icon.textContent = '📸';
+    hint.textContent = 'PNG / JPG · multiple files OK';
+    hint.className = 'dz-hint';
+    clr.classList.remove('show');
+    return;
+  }
+  zone.classList.add('has-file');
+  icon.textContent = '✓';
+  hint.textContent = `${imgFiles.length} screenshot(s) ready`;
+  hint.className = 'dz-hint ok';
+  clr.classList.add('show');
+  imgFiles.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.className = 'file-chip';
+    d.innerHTML = `<span>📄 ${f.name}</span><button class="rm" onclick="event.stopPropagation();removeImg(${i})">✕</button>`;
+    list.appendChild(d);
+  });
+}
+
+function checkReady() {
+  document.getElementById('btnAnalyse').disabled = !(dbFile && imgFiles.length);
+}
+
+// ── Analysis ──
+async function startAnalysis() {
+  if (!dbFile || !imgFiles.length) return;
+  setStatus('PROCESSING…', true);
+  setProg(true, 0, 'Uploading files…');
+  setErr('');
+  document.getElementById('btnAnalyse').disabled = true;
+  document.getElementById('btnDl').classList.remove('show');
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('emptyState').style.display = 'flex';
+
+  const fd = new FormData();
+  fd.append('db', dbFile);
+  imgFiles.forEach(f => fd.append('screenshots', f));
+
+  try {
+    const r = await fetch('/analyse', { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) { showErr(data.error); return; }
+    jobId = data.job_id;
+    poll();
+  } catch(e) { showErr('Upload failed: ' + e.message); }
+}
+
+function poll() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const r = await fetch('/status/' + jobId);
+      const job = await r.json();
+      setProg(true, job.progress, job.message);
+      if (job.status === 'done') { clearInterval(pollTimer); onDone(job); }
+      else if (job.status === 'error') { clearInterval(pollTimer); showErr(job.message); }
+    } catch(e) {}
+  }, 500);
+}
+
+function onDone(job) {
+  setProg(false, 100, '');
+  setStatus('READY', false);
+  document.getElementById('btnAnalyse').disabled = false;
+  const dl = document.getElementById('btnDl');
+  dl.href = '/download/' + jobId;
+  dl.download = job.report_file;
+  dl.classList.add('show');
+  renderDashboard(job.result);
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('results').classList.add('show');
+  // Draw chart AFTER results are visible (so offsetWidth is real)
+  requestAnimationFrame(() => requestAnimationFrame(() => drawChart(chartShots)));
+}
+
+// ── Render dashboard ──
+function renderDashboard(d) {
+  chartShots = d.shots; // store for deferred chart draw
+
+  document.getElementById('resShooter').textContent = d.shooter;
+  document.getElementById('resMeta').textContent =
+    `${d.shot_count} shots · ${d.distance}m · Mean ${fmt1(d.mean_score,3)} · Total ${fmt1(d.total_score,1)}`;
+
+  // Scorecard
+  const sc = document.getElementById('scorecard');
+  const cards = [
+    { lbl:'Mean Score', val:fmt1(d.mean_score,3), unit:'', bench:'≥ 10.5 elite',
+      r: d.mean_score>=10.5?'green':d.mean_score>=10.3?'amber':'red' },
+    { lbl:'Mean DA',    val:fmt1(d.mean_DA,2),    unit:'mm', bench:'< 1.0 elite',
+      r: d.mean_DA<=1.0?'green':d.mean_DA<=2.0?'amber':'red' },
+    { lbl:'Mean S2',    val:fmt1(d.mean_S2,1),    unit:'mm/s', bench:'< 10.0 elite',
+      r: d.mean_S2<=10.0?'green':d.mean_S2<=14.0?'amber':'red' },
+    { lbl:'Fatigue Δ',  val:(d.fatigue>=0?'+':'')+fmt1(d.fatigue,3), unit:'', bench:'≥ 0 ideal',
+      r: d.fatigue>=-0.05?'green':d.fatigue>=-0.15?'amber':'red' },
+  ];
+  sc.innerHTML = cards.map((c,i)=>`
+    <div class="stat-card ${c.r} anim" style="animation-delay:${i*60}ms">
+      <div class="stat-lbl">${c.lbl}</div>
+      <div class="stat-val ${c.r}">${c.val}<span class="stat-unit">${c.unit}</span></div>
+      <div class="stat-bench">${c.bench}</div>
+    </div>`).join('');
+
+  // Health bar
+  const tot = (d.green_count+d.amber_count+d.red_count)||1;
+  document.getElementById('healthBar').innerHTML = `
+    <div class="hseg green" style="width:${d.green_count/tot*100}%"></div>
+    <div class="hseg amber" style="width:${d.amber_count/tot*100}%"></div>
+    <div class="hseg red"   style="width:${d.red_count/tot*100}%"></div>`;
+  document.getElementById('healthCounts').innerHTML = `
+    <span class="g">● ${d.green_count} Clean</span>
+    <span class="a">● ${d.amber_count} Watch</span>
+    <span class="r">● ${d.red_count} Issue</span>`;
+
+  // Issues
+  const maxC = (d.top_issues[0]||[,1])[1];
+  document.getElementById('issuesList').innerHTML = d.top_issues.length
+    ? d.top_issues.map(([n,c])=>`
+      <div class="issue-row">
+        <div class="issue-name">${n}</div>
+        <div class="issue-bar"><div class="issue-bar-fill" style="width:${c/maxC*100}%"></div></div>
+        <div class="issue-count">${c}</div>
+      </div>`).join('')
+    : '<div style="color:var(--green);font-size:12px;font-family:var(--sans)">No major issues detected</div>';
+
+  // Drills
+  document.getElementById('drillsList').innerHTML = d.drills.map(dr=>`
+    <div class="drill-item">
+      <div class="drill-name">${dr.name}</div>
+      <div class="drill-dur">${dr.duration}</div>
+      <div class="drill-desc">${dr.desc}</div>
+    </div>`).join('');
+
+  // Table
+  allRows = d.shots;
+  renderTable('all');
+}
+
+let allRows = [];
+function filterTable(f) {
+  ['All','Green','Amber','Red'].forEach(x=>{
+    const b=document.getElementById('f'+x);
+    if(b) b.className='fb';
+  });
+  const map={all:'fa',green:'fg',amber:'fa',red:'fr'};
+  const active=document.getElementById('f'+f[0].toUpperCase()+f.slice(1));
+  if(active) active.className='fb '+(f==='all'?'fa':f==='green'?'fg':f==='red'?'fr':'fa');
+  renderTable(f);
+}
+function renderTable(filter) {
+  const rows = filter==='all' ? allRows : allRows.filter(s=>s.rating===filter);
+  document.getElementById('shotTbody').innerHTML = rows.map(s=>`
+    <tr>
+      <td>${s.id}</td>
+      <td><span class="pill ${s.rating}">${s.archetype||s.rating.toUpperCase()}</span></td>
+      <td class="num">${n1(s.score)}</td>
+      <td class="num">${n1(s.DA)}</td>
+      <td class="num">${n1(s.S1)}</td>
+      <td class="num">${n1(s.S2)}</td>
+      <td class="num">${s.hold_10!=null?s.hold_10+'%':'—'}</td>
+      <td class="num">${n1(s.aim_sec)}</td>
+      <td class="num">${s.interval!=null?Math.round(s.interval)+'s':'—'}</td>
+      <td class="diag-cell">${s.summary}</td>
+    </tr>`).join('');
+}
+
+// ── Chart ──
+function drawChart(shots) {
+  const canvas = document.getElementById('scoreChart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.getBoundingClientRect().width || canvas.parentElement.clientWidth;
+  const H = 130;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const pts = shots.map((s,i) => ({i, score:s.score, rating:s.rating})).filter(p=>p.score!=null);
+  if (pts.length < 2) return;
+
+  const scores = pts.map(p => p.score);
+  const minS = Math.max(7.5, Math.min(...scores) - 0.4);
+  const maxS = Math.min(10.95, Math.max(...scores) + 0.3);
+  const pad = {l:38, r:14, t:12, b:26};
+  const CW = W - pad.l - pad.r;
+  const CH = H - pad.t - pad.b;
+  const n = pts.length;
+
+  const sx = p => pad.l + (p.i / (n-1)) * CW;
+  const sy = v => pad.t + CH - ((v - minS) / (maxS - minS)) * CH;
+
+  // Grid
+  ctx.lineWidth = 0.5;
+  [10.3, 10.5, 10.7, 10.9].forEach(g => {
+    const y = sy(g);
+    if (y < pad.t || y > pad.t+CH) return;
+    ctx.strokeStyle = '#1a2a35';
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l+CW, y); ctx.stroke();
+    ctx.fillStyle = '#3d5566';
+    ctx.font = `9px ${getComputedStyle(document.body).getPropertyValue('--mono').trim()}`;
+    ctx.textAlign = 'right';
+    ctx.fillText(g.toFixed(1), pad.l-5, y+3);
+  });
+
+  // Elite dashed line at 10.5
+  const elY = sy(10.5);
+  ctx.setLineDash([4,4]);
+  ctx.strokeStyle = 'rgba(39,201,111,.2)';
+  ctx.beginPath(); ctx.moveTo(pad.l, elY); ctx.lineTo(pad.l+CW, elY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Area gradient
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t+CH);
+  grad.addColorStop(0, 'rgba(232,160,32,.18)');
+  grad.addColorStop(1, 'rgba(232,160,32,0)');
+  ctx.beginPath();
+  ctx.moveTo(sx(pts[0]), sy(pts[0].score));
+  pts.forEach(p => ctx.lineTo(sx(p), sy(p.score)));
+  ctx.lineTo(sx(pts[pts.length-1]), pad.t+CH);
+  ctx.lineTo(sx(pts[0]), pad.t+CH);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.strokeStyle = '#e8a020';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(sx(pts[0]), sy(pts[0].score));
+  pts.forEach(p => ctx.lineTo(sx(p), sy(p.score)));
+  ctx.stroke();
+
+  // Dots
+  pts.forEach(p => {
+    const col = p.rating==='green'?'#27c96f':p.rating==='red'?'#e5403a':'#e8a020';
+    ctx.beginPath();
+    ctx.arc(sx(p), sy(p.score), 3, 0, Math.PI*2);
+    ctx.fillStyle = col;
+    ctx.fill();
+  });
+
+  // X labels
+  ctx.fillStyle = '#3d5566';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(n/12));
+  pts.forEach(p => {
+    if (p.i % step === 0 || p.i === n-1)
+      ctx.fillText(p.i+1, sx(p), pad.t+CH+16);
+  });
+}
+
+// ── Helpers ──
+const fmt1 = (v,d=1) => v!=null ? Number(v).toFixed(d) : '—';
+const n1    = (v,d=1) => v!=null ? Number(v).toFixed(d) : '—';
+
+function setStatus(t, pulse) {
+  const el = document.getElementById('hdrStatus');
+  el.textContent = t;
+  el.className = 'hdr-status' + (pulse ? ' pulsing' : '');
+}
+function setProg(on, pct, msg) {
+  document.getElementById('progWrap').className = 'prog-wrap' + (on ? ' on' : '');
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progMsg').textContent = msg;
+}
+function showErr(msg) {
+  setProg(false, 0, '');
+  setStatus('ERROR', false);
+  document.getElementById('btnAnalyse').disabled = false;
+  const el = document.getElementById('errBanner');
+  el.textContent = '⚠ ' + msg;
+  el.classList.add('show');
+}
+function setErr(msg) {
+  const el = document.getElementById('errBanner');
+  if (!msg) { el.classList.remove('show'); return; }
+  el.textContent = msg; el.classList.add('show');
+}
+
+// Redraw chart on resize
+window.addEventListener('resize', () => {
+  if (chartShots.length) drawChart(chartShots);
+});
+</script>
+</body>
+</html>
