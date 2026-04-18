@@ -2,7 +2,7 @@ flask
 reportlab
 pillow
 pytesseract
-opencv-python
+opencv-python-headless
 streamlit
 pandas
 altair
