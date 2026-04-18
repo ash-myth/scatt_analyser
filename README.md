@@ -107,7 +107,7 @@ scatt_analyser/
 
 ## Screenshots
 
-![SCATT Analyser Dashboard](https://scattanalyser-ashmit.streamlit.app/)
+![SCATT Analyser Dashboard](screenshot.png)
 
 ---
 
