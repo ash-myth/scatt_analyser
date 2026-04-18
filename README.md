@@ -2,7 +2,7 @@
 
 > **Shooting session intelligence — upload, analyse, improve.**
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-scattanalyser--ashmit.streamlit.app-e8ff47?style=for-the-badge&logo=streamlit&logoColor=black)](https://scattanalyser-ashmit.streamlit.app/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-App-e8ff47?style=for-the-badge&logo=streamlit&logoColor=black)](https://scattanalyser-ashmit.streamlit.app/)
 [![Python](https://img.shields.io/badge/Python-3.10-blue?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.56-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
 
