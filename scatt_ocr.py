@@ -1,12 +1,3 @@
-"""
-scatt_ocr.py  —  Robust OCR for SCATT Expert screenshot tables
-================================================================
-Supports multiple screenshots from the same session.
-Shot IDs are read from the # column and used to merge/deduplicate.
-Falls back to sequential numbering if IDs are unreadable.
-Hard cap: 100 shots total across all screenshots.
-"""
-
 import re
 import os
 import sys
@@ -190,7 +181,6 @@ def extract(image_paths, min_conf=30, progress_cb=None):
     """
     if isinstance(image_paths, str):
         image_paths = [image_paths]
-    # Sort by filename so screenshot_00, screenshot_01 etc. merge in order
     image_paths = sorted(image_paths, key=lambda p: os.path.basename(p).lower())
     total = len(image_paths)
     all_shots = []
@@ -254,7 +244,6 @@ def extract(image_paths, min_conf=30, progress_cb=None):
         s.pop("_source", None)
 
     return shots_out
-
 
 if __name__ == "__main__":
     paths = sys.argv[1:] if len(sys.argv) > 1 else ["scatt.png"]
