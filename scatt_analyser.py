@@ -1,9 +1,3 @@
-"""
-SCATT Performance Analyser
-Session intelligence engine + PDF report generator
-Works with .scatt-expert files (SQLite format)
-"""
-
 import sqlite3
 import struct
 import zlib
@@ -139,7 +133,6 @@ def inject_screenshot_data(session: dict, shot_metrics: list) -> None:
     for shot in session["shots"]:
         m = lookup.get(shot["id"])
         if m:
-            # Override DB aiming_sec with OCR value if available
             if m.get("aiming_sec") is not None:
                 shot["aiming_sec"] = m["aiming_sec"]
             shot.update({k: v for k, v in m.items() if k != "aiming_sec"})
@@ -168,38 +161,33 @@ def classify_shot(shot: dict) -> dict:
     DA      = shot.get("DA")
     S2      = shot.get("S2")
     S1      = shot.get("S1")
-    hold_10 = shot.get("hold_10")  # e.g. 74 (%)
+    hold_10 = shot.get("hold_10")  
     hold_10a= shot.get("hold_10a")
     t       = shot.get("aiming_sec")
     iv      = shot.get("interval")
 
-    # — Aiming time flags —
     if t is not None:
         if t < BENCH["aiming_min"]:
             diag["flags"].append(("RUSHED", "Fired too quickly — hold may not have settled."))
         elif t > BENCH["aiming_max"]:
             diag["flags"].append(("PROLONGED", f"Aiming time {t:.1f}s is long — hunt risk increases."))
 
-    # — Interval flags —
     if iv is not None:
         if iv > 85:
             diag["flags"].append(("LONG PAUSE", f"{iv:.0f}s between shots — check focus/routine."))
 
-    # — Deviation at shot (DA) —
     if DA is not None:
         if DA > BENCH["DA_good"]:
             diag["flags"].append(("HIGH DEVIATION", f"Shot released {DA}mm from centre — timing or coordination issue."))
         elif DA > BENCH["DA_elite"]:
             diag["flags"].append(("DEVIATION", f"{DA}mm offset at release — aim for <1mm."))
 
-    # — Final speed S2 —
     if S2 is not None:
         if S2 > BENCH["S2_good"]:
             diag["flags"].append(("FAST FINAL PHASE", f"Barrel moving at {S2:.1f}mm/s in last 0.25s — possible flinch or rush."))
         elif S2 > BENCH["S2_elite"]:
             diag["flags"].append(("SPEED WARNING", f"S2={S2:.1f}mm/s — slow down the final approach."))
 
-    # — Hold stability —
     if hold_10 is not None:
         h = int(str(hold_10).replace("%", "")) if isinstance(hold_10, str) else hold_10
         if h < BENCH["hold_pct_good"]:
@@ -207,7 +195,6 @@ def classify_shot(shot: dict) -> dict:
         elif h < BENCH["hold_pct_elite"]:
             diag["flags"].append(("HOLD DRIFT", f"{h}% in 10-ring — close but not elite-level consistency."))
 
-    # — Archetype classification —
     if DA is not None and DA > 2.5 and S2 is not None and S2 > 14:
         diag["archetype"] = "FLINCH / SNATCH"
         diag["flags"].append(("FLINCH SIGNATURE", "High deviation + fast final phase = likely trigger snatch or anticipation."))
@@ -250,8 +237,6 @@ def classify_shot(shot: dict) -> dict:
             diag["summary"] = "Acceptable. Minor refinements available."
 
     return diag
-
-
 def analyse_session(session: dict) -> dict:
     """Run full session analysis. Returns enriched analysis object."""
     shots = session["shots"]
@@ -348,12 +333,8 @@ def build_report(analysis: dict, output_path: str):
         leftMargin=15*mm, rightMargin=15*mm,
         topMargin=12*mm,  bottomMargin=12*mm,
     )
-
-    W = A4[0] - 30*mm   # usable width
-
-    # ── Styles ──
+    W = A4[0] - 30*mm   
     styles = getSampleStyleSheet()
-
     def style(name, **kw):
         base = kw.pop("base", "Normal")
         s = ParagraphStyle(name, parent=styles[base], **kw)
@@ -604,20 +585,16 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # ── 1. Load session from DB ──────────────────────────────────────────────
     print(f"[1/4] Loading session from: {args.db}")
     session = load_session(args.db)
     shooter = session["shooter"].title()
     print(f"      Shooter: {shooter}  |  DB shots: {session['shot_count']}")
 
-    # ── 2. OCR the screenshot ────────────────────────────────────────────────
     if args.screenshot:
         img_path = args.screenshot
     else:
-        # Auto-detect: look for any PNG/JPG in current directory
         import glob
         candidates = glob.glob("*.png") + glob.glob("*.jpg") + glob.glob("*.jpeg")
-        # Prefer files with 'scatt' in name
         scatt_candidates = [f for f in candidates if "scatt" in f.lower()]
         img_path = scatt_candidates[0] if scatt_candidates else (candidates[0] if candidates else None)
 
@@ -636,8 +613,6 @@ if __name__ == "__main__":
         inject_screenshot_data(session, shot_metrics)
     else:
         print("[2/4] No screenshot found — proceeding with DB data only (metrics will be partial)")
-
-    # ── 3. Analyse ───────────────────────────────────────────────────────────
     print("[3/4] Analysing session...")
     analysis = analyse_session(session)
 
@@ -655,8 +630,6 @@ if __name__ == "__main__":
     print(f"  Fatigue Δ  : {analysis['fatigue_delta']:+.3f}")
     print(f"  Top issue  : {analysis['top_issues'][0] if analysis['top_issues'] else 'None'}")
     print(f"{'='*52}\n")
-
-    # ── 4. Build PDF ─────────────────────────────────────────────────────────
     out_path = args.out or f"SCATT_Report_{shooter.replace(' ', '_')}.pdf"
     print(f"[4/4] Building PDF → {out_path}")
     build_report(analysis, out_path)
