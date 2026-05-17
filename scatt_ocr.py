@@ -5,9 +5,7 @@ import cv2
 import numpy as np
 import pytesseract
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 MAX_SHOTS = 100
-
 COLS = [
     ("id",       0.00, 0.07),
     ("D",        0.07, 0.15),
@@ -76,7 +74,6 @@ def _parse_id(s):
 
 
 def extract_single(image_path, min_conf=30):
-    """Extract shots from a single screenshot."""
     img = cv2.imread(image_path)
     if img is None:
         raise FileNotFoundError(f"Cannot open image: {image_path}")
@@ -174,11 +171,6 @@ def extract_single(image_path, min_conf=30):
 
 
 def extract(image_paths, min_conf=30, progress_cb=None):
-    """
-    Extract and merge shots from one or more screenshots.
-    progress_cb: callable(done, total, path)
-    Returns sorted deduplicated list of shot dicts, max 100 shots.
-    """
     if isinstance(image_paths, str):
         image_paths = [image_paths]
     image_paths = sorted(image_paths, key=lambda p: os.path.basename(p).lower())
